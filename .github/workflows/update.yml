@@ -1,0 +1,44 @@
+name: Update World Cup tracker
+
+# Runs four times a day at Irish local time (the tournament runs entirely
+# during Irish Summer Time = UTC+1, so these UTC times map to 06:00 / 12:00
+# / 18:00 / 00:00 in Ireland). You can also trigger a run by hand from the
+# Actions tab (the "Run workflow" button).
+on:
+  schedule:
+    - cron: '0 5 * * *'    # 06:00 Irish
+    - cron: '0 11 * * *'   # 12:00 Irish
+    - cron: '0 17 * * *'   # 18:00 Irish
+    - cron: '0 23 * * *'   # 00:00 Irish
+  workflow_dispatch: {}
+
+# Lets the job commit the updated ledger + page back to the repo.
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build (fetch results, merge, render)
+        run: python build.py
+
+      - name: Commit and push if anything changed
+        run: |
+          git config user.name "worldcup-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/ledger.json index.html
+          if git diff --staged --quiet; then
+            echo "No changes this run."
+          else
+            git commit -m "Auto update: $(TZ=Europe/Dublin date '+%d %b %Y %H:%M')"
+            git push
+          fi
